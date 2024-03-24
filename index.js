@@ -157,40 +157,115 @@ const server = http.createServer((req, res) => {
                 return;
             }
 
-
-
             try {
                 const updatedData = [];
 
                 if (query.id) {
-                    const jsonData = JSON.parse(data).filter((el) => el.id !== query.id);
+                    const jsonData = JSON.parse(data).filter(
+                        (el) => el.id !== query.id
+                    );
                     const updatedJson = JSON.stringify(jsonData, null, 4);
 
-                    JSON.parse(data).forEach(el => {
-                        if(el.id !== query.id){
-                            updatedData.push(el)
+                    JSON.parse(data).forEach((el) => {
+                        if (el.id !== query.id) {
+                            updatedData.push(el);
                         }
-                    })
+                    });
                 }
 
-                fs.writeFile("./data.json", JSON.stringify(updatedData), (err) => {
-                    if (err) {
-                        console.log("Error write file", err);
-                        res.writeHead(500);
-                        res.end({ error: "Internal Server Error" });
-                    }
+                fs.writeFile(
+                    "./data.json",
+                    JSON.stringify(updatedData),
+                    (err) => {
+                        if (err) {
+                            console.log("Error write file", err);
+                            res.writeHead(500);
+                            res.end({ error: "Internal Server Error" });
+                        }
 
-                    res.writeHead(200);
-                    res.end();
-                });
+                        res.writeHead(200);
+                        res.end();
+                    }
+                );
             } catch (err) {
                 console.log("Error delete note", err);
                 res.writeHead(500);
                 res.end({ error: "Internal Server Error" });
             }
         });
-    } else if (req.method === "PUT") {
+    } else if (pathname === "/api" && req.method === "PUT") {
         // 5. Редактирование записи по id
+
+        let body = "";
+
+        req.on("data", (chunk) => {
+            body += chunk.toString();
+        });
+
+        req.on("end", () => {
+            const updateData = JSON.parse(body),
+                  { id, title, message } = updateData;
+
+            if (!id || (!title && !message)) {
+                res.writeHead(400);
+                res.end({ error: "Internal Server Error" });
+                return;
+            }
+
+            fs.readFile("./data.json", "utf-8", (err, data) => {
+                if (err) {
+                    res.writeHead(500);
+                    res.end({ error: "Internal Server Error" });
+                    return;
+                }
+
+                try {
+                    let records = JSON.parse(data);
+                    const recordIndex = records.findIndex(
+                        (record) => record.id === id
+                    );
+
+                    if (recordIndex === -1) {
+                        res.writeHead(404);
+                        res.end({ error: "Internal Server Error" });
+                        return;
+                    }
+
+                    const   recordToUpdate = records[recordIndex],
+                            isTitleChanged = title && title !== recordToUpdate.title,
+                            isMessageChanged = message && message !== recordToUpdate.message;
+
+                    if (!isTitleChanged && !isMessageChanged) {
+                        res.writeHead(200);
+                        res.end();
+                        return;
+                    }
+
+                    if (isTitleChanged) recordToUpdate.title = title;
+                    if (isMessageChanged) recordToUpdate.message = message;
+
+                    fs.writeFile(
+                        "./data.json",
+                        JSON.stringify(records, null, 4),
+                        "utf-8",
+                        (err) => {
+                            if (err) {
+                                res.writeHead(500);
+                                res.end({ error: "Internal Server Error" });
+                                return;
+                            }
+
+                            res.writeHead(200);
+                            res.end();
+                        }
+                    );
+                } catch (err) {
+                    console.log("Error parsing: ", err.message);
+                    res.writeHead(500);
+                    res.end({ error: "Internal Server Error" });
+                }
+            });
+        });
     } else {
     }
 });
