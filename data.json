@@ -2,7 +2,12 @@
     {
         "title": "Note title",
         "message": "Note message",
-        "id": "cc59e1ac-efe3-492f-8904-3b3ff2b48397"
+        "id": "cc59e1ac-efe3-492f-8904-3b3ff2b48397",
+        "author": {
+            "name": "Ivan",
+            "surname": "Petrov",
+            "date": "2024-03-26T15:17:23.619Z"
+        }
     },
     {
         "title": "Second note title",
@@ -31,12 +36,17 @@
     },
     {
         "title": "Seventh note title",
-        "message": "Seventh note message",
+        "message": "7 message",
         "id": "2b1e7d2d-3c1e-4d7b-9a8d-8c7e1d7d8c9e"
     },
     {
         "title": "Eighth note title",
         "message": "Eighth note message",
         "id": "8d7e9d7e-7d1e-4c7b-9d8d-8d7c1d7d8e8d"
+    },
+    {
+        "title": "9 note title",
+        "message": "9 note message",
+        "id": "8329fb0e-1caf-4804-880a-01b46ba168b2"
     }
 ]
