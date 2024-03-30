@@ -1,10 +1,8 @@
-const   fs = require('fs'),
-        url = require('url'),
-        {generateUUID} = require('../utils/user');
+const fs = require("fs"),
+    url = require("url"),
+    { generateUUID, updateLinks } = require("../utils/user");
 
-
-
-function getUserData(req, res){
+function getUserData(req, res) {
     fs.readFile(process.env.JSON_FILE, "utf-8", (err, data) => {
         if (err) {
             console.log("Error read Json file", err.message);
@@ -15,13 +13,12 @@ function getUserData(req, res){
         }
 
         const parsedUrl = url.parse(req.url, true),
-            {query} = parsedUrl;
+            { query } = parsedUrl;
 
         data = JSON.parse(data);
 
         try {
             if (query.id) {
-
                 let index;
 
                 const object = data.findIndex((el, i) => {
@@ -31,7 +28,6 @@ function getUserData(req, res){
                 });
 
                 if (index) {
-
                     res.writeHead(200);
                     res.end(JSON.stringify(data[index]));
 
@@ -78,54 +74,52 @@ function getUserData(req, res){
     });
 }
 
-function createUserNote(req, res){
-
+function createUserNote(req, res) {
     let body = "";
 
-        req.on("data", (chunk) => {
-            body += chunk.toString();
+    req.on("data", (chunk) => {
+        body += chunk.toString();
+    });
+
+    req.on("end", () => {
+        fs.readFile("./data.json", "utf8", (err, data) => {
+            if (err) {
+                console.log("Error reading JSON file: ", err.message);
+                res.writeHead(500);
+                res.end({ error: "Internal Server Error" });
+
+                return;
+            }
+
+            try {
+                const jsonData = JSON.parse(data);
+
+                body = JSON.parse(body);
+
+                jsonData.push({ ...body, id: generateUUID() });
+
+                const updatedJSON = JSON.stringify(jsonData, null, 4);
+
+                fs.writeFile("./data.json", updatedJSON, "utf8", (err) => {
+                    if (err) {
+                        console.log("Error writing: ", err.message);
+                        res.writeHead(500);
+                        res.end({ error: "Internal Server Error" });
+                    } else {
+                        res.writeHead(200);
+                        res.end(JSON.stringify(body));
+                    }
+                });
+            } catch (err) {
+                console.log("Error parsing: ", err.message);
+                res.writeHead(500);
+                res.end({ error: "Internal Server Error" });
+            }
         });
-
-        req.on("end", () => {
-            fs.readFile("./data.json", "utf8", (err, data) => {
-                if (err) {
-                    console.log("Error reading JSON file: ", err.message);
-                    res.writeHead(500);
-                    res.end({ error: "Internal Server Error" });
-
-                    return;
-                }
-
-                try {
-                    const jsonData = JSON.parse(data);
-
-                    body = JSON.parse(body);
-
-                    jsonData.push({ ...body, id: generateUUID() });
-
-                    const updatedJSON = JSON.stringify(jsonData, null, 4);
-
-                    fs.writeFile("./data.json", updatedJSON, "utf8", (err) => {
-                        if (err) {
-                            console.log("Error writing: ", err.message);
-                            res.writeHead(500);
-                            res.end({ error: "Internal Server Error" });
-                        } else {
-                            res.writeHead(200);
-                            res.end(JSON.stringify(body));
-                        }
-                    });
-                } catch (err) {
-                    console.log("Error parsing: ", err.message);
-                    res.writeHead(500);
-                    res.end({ error: "Internal Server Error" });
-                }
-            });
-        });
+    });
 }
 
-function deleteUserNote(req, res){
-
+function deleteUserNote(req, res) {
     fs.readFile("./data.json", "utf8", (err, data) => {
         if (err) {
             console.log("Error delete note", err);
@@ -136,34 +130,30 @@ function deleteUserNote(req, res){
         }
 
         const parsedUrl = url.parse(req.url, true),
-              {query} = parsedUrl;
+            { query } = parsedUrl;
 
         try {
             const updatedData = [],
-                arrayData = JSON.parse(data)
+                arrayData = JSON.parse(data);
 
             if (query.id) {
-                arrayData.forEach(user => {
-                    if(user.id !== query.id){
+                arrayData.forEach((user) => {
+                    if (user.id !== query.id) {
                         updatedData.push(user);
                     }
                 });
             }
 
-            fs.writeFile(
-                "./data.json",
-                JSON.stringify(updatedData),
-                (err) => {
-                    if (err) {
-                        console.log("Error write file", err);
-                        res.writeHead(500);
-                        res.end({ error: "Internal Server Error" });
-                    }
-
-                    res.writeHead(200);
-                    res.end({});
+            fs.writeFile("./data.json", JSON.stringify(updatedData), (err) => {
+                if (err) {
+                    console.log("Error write file", err);
+                    res.writeHead(500);
+                    res.end({ error: "Internal Server Error" });
                 }
-            );
+
+                res.writeHead(200);
+                res.end({});
+            });
         } catch (err) {
             console.log("Error delete note", err);
             res.writeHead(500);
@@ -172,84 +162,183 @@ function deleteUserNote(req, res){
     });
 }
 
-function editUserNote(req, res){
-
+function editUserNote(req, res) {
     let body = "";
 
-        req.on("data", (chunk) => {
-            body += chunk.toString();
-        });
+    req.on("data", (chunk) => {
+        body += chunk.toString();
+    });
 
-        req.on("end", () => {
-            const   updateData = JSON.parse(body),
-                    { id, title, message } = updateData;
+    req.on("end", () => {
+        const updateData = JSON.parse(body),
+            { id, title, message } = updateData;
 
-            if (!id || (!title && !message)) {
-                res.writeHead(400);
+        if (!id || (!title && !message)) {
+            res.writeHead(400);
+            res.end({ error: "Internal Server Error" });
+            return;
+        }
+
+        fs.readFile("./data.json", "utf-8", (err, data) => {
+            if (err) {
+                res.writeHead(500);
                 res.end({ error: "Internal Server Error" });
                 return;
             }
 
-            fs.readFile("./data.json", "utf-8", (err, data) => {
-                if (err) {
-                    res.writeHead(500);
+            try {
+                let records = JSON.parse(data);
+                const recordIndex = records.findIndex(
+                    (record) => record.id === id
+                );
+
+                if (recordIndex === -1) {
+                    res.writeHead(404);
                     res.end({ error: "Internal Server Error" });
                     return;
                 }
 
-                try {
-                    let records = JSON.parse(data);
-                    const recordIndex = records.findIndex(
-                        (record) => record.id === id
-                    );
+                const recordToUpdate = records[recordIndex],
+                    isTitleChanged = title && title !== recordToUpdate.title,
+                    isMessageChanged =
+                        message && message !== recordToUpdate.message;
 
-                    if (recordIndex === -1) {
-                        res.writeHead(404);
-                        res.end({ error: "Internal Server Error" });
-                        return;
-                    }
+                if (!isTitleChanged && !isMessageChanged) {
+                    res.writeHead(200);
+                    res.end();
+                    return;
+                }
 
-                    const   recordToUpdate = records[recordIndex],
-                            isTitleChanged = title && title !== recordToUpdate.title,
-                            isMessageChanged = message && message !== recordToUpdate.message;
+                if (isTitleChanged) recordToUpdate.title = title;
+                if (isMessageChanged) recordToUpdate.message = message;
 
-                    if (!isTitleChanged && !isMessageChanged) {
+                fs.writeFile(
+                    "./data.json",
+                    JSON.stringify(records, null, 4),
+                    "utf-8",
+                    (err) => {
+                        if (err) {
+                            res.writeHead(500);
+                            res.end({ error: "Internal Server Error" });
+                            return;
+                        }
+
                         res.writeHead(200);
                         res.end();
-                        return;
                     }
-
-                    if (isTitleChanged) recordToUpdate.title = title;
-                    if (isMessageChanged) recordToUpdate.message = message;
-
-                    fs.writeFile(
-                        "./data.json",
-                        JSON.stringify(records, null, 4),
-                        "utf-8",
-                        (err) => {
-                            if (err) {
-                                res.writeHead(500);
-                                res.end({ error: "Internal Server Error" });
-                                return;
-                            }
-
-                            res.writeHead(200);
-                            res.end();
-                        }
-                    );
-                } catch (err) {
-                    console.log("Error parsing: ", err.message);
-                    res.writeHead(500);
-                    res.end({ error: "Internal Server Error" });
-                }
-            });
+                );
+            } catch (err) {
+                console.log("Error parsing: ", err.message);
+                res.writeHead(500);
+                res.end({ error: "Internal Server Error" });
+            }
         });
+    });
 }
 
+function setAuthor(req, res) {
+    let body = "";
+
+    req.on("data", (chunk) => {
+        body += chunk.toString();
+    });
+
+    req.on("end", () => {
+        fs.readFile("./data.json", "utf8", (err, data) => {
+            if (err) {
+                console.log("Error reading JSON file: ", err.message);
+                res.writeHead(500);
+                res.end({ error: "Internal Server Error" });
+
+                return;
+            }
+
+            try {
+                body = JSON.parse(body);
+
+                if (
+                    body.name &&
+                    body.surname &&
+                    Object.keys(body).length === 2
+                ) {
+                    const parsedUrl = url.parse(req.url, true),
+                        { query } = parsedUrl;
+
+                    if (query.id) {
+                        const arrayData = JSON.parse(data),
+                            selectedIndex = arrayData.findIndex(
+                                (el) => el.id === query.id
+                            ),
+                            selectedNote = arrayData[selectedIndex];
+
+                        if (!selectedNote) {
+                            res.writeHead(404);
+                            res.end(
+                                JSON.stringify({ error: "Invalid note's id" })
+                            );
+                        }
+
+                        selectedNote.author = {
+                            ...body,
+                            date: moment().format("DD MMMM YYYY, h:mm:ss A"),
+                        };
+
+                        arrayData[selectedIndex] = selectedNote;
+
+                        fs.writeFile(
+                            "./data.json",
+                            JSON.stringify(arrayData),
+                            "utf8",
+                            (err) => {
+                                if (err) {
+                                    console.log("Error writing: ", err.message);
+                                    res.writeHead(500);
+                                    res.end({ error: "Internal Server Error" });
+                                } else {
+                                    res.writeHead(200);
+                                    res.end(JSON.stringify(body));
+                                }
+                            }
+                        );
+
+                        res.writeHead(200);
+                        res.end(JSON.stringify(selectedNote));
+                    } else {
+                        res.writeHead(329);
+                        res.end(JSON.stringify("Invalid note's id"));
+                    }
+                } else {
+                    res.writeHead(329);
+                    res.end(JSON.stringify("Invalid body values"));
+                }
+            } catch (err) {
+                console.log("Error parsing: ", err.message);
+                res.writeHead(500);
+                res.end({ error: "Internal Server Error" });
+            }
+        });
+    });
+}
+
+function setLinks() {
+    let body = "";
+
+    req.on("data", (chunk) => {
+        body += chunk.toString();
+    });
+
+    req.on("end", () => {
+        const { sourceId, targetId } = JSON.parse(body);
+
+        updateLinks(sourceId, targetId, res);
+    });
+}
 
 module.exports = {
     getUserData,
     createUserNote,
     deleteUserNote,
-    editUserNote
-}
+    editUserNote,
+    setAuthor,
+    setLinks,
+};
